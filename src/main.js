@@ -1,15 +1,16 @@
 import Vue from 'vue'
 import App from './App.vue'
-import router from './router/index'
+import router from './router'
+import store from './store'
 import './assets/font/iconfont.css'
-import vant from 'vant'
+import Vant from 'vant'
 import 'vant/lib/index.css'
 import 'amfe-flexible'
-Vue.use(vant)
-Vue.use(router)
+Vue.use(Vant)
 Vue.config.productionTip = false
 
 new Vue({
   router,
-  render: h => h(App)
+  store,
+  render: (h) => h(App)
 }).$mount('#app')
