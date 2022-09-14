@@ -5,32 +5,61 @@
         <van-button icon="search" size="small" round block>搜索</van-button>
       </template>
     </van-nav-bar>
+    <!-- active:高亮的tab的索引 -->
     <van-tabs v-model="active" swipeable>
       <van-tab v-for="item in channels" :key="item.id" :title="item.name">
+        <!-- 文章详情 -->
         <article-list :id="item.id"></article-list>
       </van-tab>
-      <span class="toutiao toutiao-gengduo"></span>
+      <span class="toutiao toutiao-gengduo" @click="isShow = true"></span>
     </van-tabs>
+
+    <!-- 弹出层 -->
+    <van-popup
+      closeable
+      close-icon-position="top-left"
+      v-model="isShow"
+      position="bottom"
+      :style="{ height: '100%' }"
+    >
+      <channel-edit
+      v-if="isShow"
+        @change-active=";[(isShow = false), (active = $event)]"
+        :myChannels="channels"
+        @del-channel="delChannel"
+        @add-channel="addChannel"
+      ></channel-edit>
+    </van-popup>
   </div>
 </template>
 
 <script>
-import { getChannelAPI } from '@/api'
-import ArticleList from './components/ArticleList'
+import { getChannelAPI, delChannelAPI, addChannelAPI } from '@/api'
+import ArticleList from './components/ArticleList.vue'
+import ChannelEdit from './components/ChannelEdit.vue'
+import { mapGetters, mapMutations } from 'vuex'
 export default {
-  components: {
-    ArticleList
-  },
   data() {
     return {
       active: 0,
-      channels: []
+      channels: [],
+      isShow: false
     }
   },
-  created() {
-    this.getChannel()
+  components: {
+    ArticleList,
+    ChannelEdit
   },
+  computed: {
+    ...mapGetters(['isLogin'])
+  },
+  created() {
+    this.initChannels()
+  },
+  // 1.?? ==> 相当于||，常用于语句  && 常用于if中
+  // 2.?. ==> 可选链操作符，?前面时undifined，那么不会往后取值
   methods: {
+    ...mapMutations(['SET_MY_CHANNEL']),
     async getChannel() {
       try {
         const { data } = await getChannelAPI()
@@ -40,7 +69,59 @@ export default {
           throw error
         } else {
           const status = error.response.status
-          status === 507 ?? this.$toast.fail('服务器异常，请刷新')
+          // ?? 前面语句为真时，才执行后面的语句
+          status === 507 ?? this.$toast.fail('请刷新')
+        }
+      }
+    },
+    async delChannel(id) {
+      try {
+        const newChannels = this.channels.filter((item) => item.id !== id)
+        if (this.isLogin) {
+          await delChannelAPI(id)
+        } else {
+          // 123
+          this.SET_MY_CHANNEL(newChannels)
+        }
+
+        this.channels = newChannels
+        this.$toast.success('删除频道成功')
+      } catch (error) {
+        if (error.response && error.response.status === 401) {
+          this.$toast.fail('请登录再删除')
+        } else {
+          throw error
+        }
+      }
+    },
+    async addChannel(channel) {
+      try {
+        if (this.isLogin) {
+          await addChannelAPI(channel.id, this.channels.length)
+        } else {
+          // qwe
+          this.SET_MY_CHANNELS([...this.channels, channel])
+        }
+
+        this.channels.push(channel)
+        this.$toast.success('添加频道成功')
+      } catch (error) {
+        if (error.response && error.response.status === 401) {
+          this.$toast.fail('请登录再添加')
+        } else {
+          throw error
+        }
+      }
+    },
+    initChannels() {
+      if (this.isLogin) {
+        this.getChannel()
+      } else {
+        const myChannels = this.$store.state.myChannels
+        if (myChannels.length === 0) {
+          this.getChannel()
+        } else {
+          this.channels = myChannels
         }
       }
     }
@@ -48,9 +129,12 @@ export default {
 }
 </script>
 
-<style scoped lang="less">
+<style lang="less" scoped>
 .navbar {
-  background-color: #3296fa; // inherit 继承 // unset 不设置
+  background-color: #3296fa;
+
+  // inherit 继承
+  // unset 不设置
   :deep(.van-nav-bar__title) {
     max-width: unset;
   }
@@ -60,6 +144,7 @@ export default {
     color: #fff;
     font-size: 30px;
   }
+
   .van-icon {
     color: #fff;
   }
@@ -70,14 +155,19 @@ export default {
 /* tabs导航条样式 */
 :deep(.van-tabs__wrap) {
   padding-right: 66px;
+
   .van-tabs__nav {
     padding-left: 0;
-    padding-right: 0; /* tab标签 */
+    padding-right: 0;
+
+    /* tab标签 */
     .van-tab {
       border: 1px solid #eee;
       width: 200px;
       height: 82px;
-    } /* tab标签下划线 */
+    }
+
+    /* tab标签下划线 */
     .van-tabs__line {
       width: 31px;
       height: 6px;
@@ -85,7 +175,9 @@ export default {
       bottom: 40px;
     }
   }
-} /* 字体图标 */
+}
+
+/* 字体图标 */
 .toutiao-gengduo {
   position: absolute;
   top: 0;
@@ -97,6 +189,7 @@ export default {
   text-align: center;
   opacity: 0.6;
   border-bottom: 1px solid #eee;
+
   &::after {
     content: '';
     position: absolute;
